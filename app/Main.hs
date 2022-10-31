@@ -30,4 +30,4 @@ main = do
        wordmap = createWordMap words
 
    -- sMatchLoop wordmap "" sorted
-   pMatchLoop wordmap sorted
+   pMatch wordmap sorted

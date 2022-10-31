@@ -33,16 +33,21 @@ filterPartialMatches letters words = do
       Just word -> pure (word, rest)
       Nothing -> []
 
-foobar :: WordMap -> [Char] -> [String] -> Either String [[String]]
-foobar wordmap letters words = f <$> pMatchRecurse letters words
-   where f = fmap (\word -> HashMap.findWithDefault [word] word wordmap)
-
-pMatchLoop :: WordMap -> [String] -> IO ()
-pMatchLoop wordmap words = do
-   letters <- getLine
-   let sortedLetters = sort letters
-       matches = foobar wordmap sortedLetters words
-   print matches
+tryNextWord ::
+   (MonadError String m) =>
+   [String] ->
+   [(String, [Char])]
+   -> m [String]
+tryNextWord _ [] = throwError "no matches available"
+tryNextWord words ((nextWord, remaining):otherOptions) =
+   if remaining == ""
+      then pure [nextWord]
+      else do
+         catchError
+            (do
+               downstreamMatches <- pMatchRecurse remaining words
+               pure $ nextWord : downstreamMatches
+            ) (const $ tryNextWord words otherOptions)
 
 pMatchRecurse ::
    (MonadError String m) =>
@@ -54,21 +59,18 @@ pMatchRecurse letters words =
        fpMatches = filterPartialMatches sortedLetters words
        sortedByLongest = sortBy sortfn fpMatches
    in
-   beepboop words sortedByLongest
+   tryNextWord words sortedByLongest
    where
-      -- puts longest words first
+      -- puts highest value words first
       sortfn (word1, _) (word2, _) = wordScrabbleValue word2 `compare` wordScrabbleValue word1
 
-beepboop ::
-   (MonadError String m) =>
-   [String] -> [(String, [Char])] -> m [String]
-beepboop _ [] = throwError "no matches available"
-beepboop words ((nextWord, remaining):otherOptions) =
-   if remaining == ""
-      then pure [nextWord]
-      else do
-         catchError
-            (do
-               matchedWords <- pMatchRecurse remaining words
-               pure $ nextWord : matchedWords
-            ) (const $ beepboop words otherOptions)
+runRecurse :: WordMap -> [Char] -> [String] -> Either String [[String]]
+runRecurse wordmap letters words = f <$> pMatchRecurse letters words
+   where f = fmap (\word -> HashMap.findWithDefault [word] word wordmap)
+
+pMatch :: WordMap -> [String] -> IO ()
+pMatch wordmap words = do
+   letters <- getLine
+   let sortedLetters = sort letters
+       matches = runRecurse wordmap sortedLetters words
+   print matches
