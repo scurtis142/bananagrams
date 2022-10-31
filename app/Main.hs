@@ -14,6 +14,8 @@ import Data.Bifunctor (Bifunctor(first))
 -- import Control.Monad.Reader (MonadReader)
 import Control.Monad.Except (MonadError (throwError), catchError)
 
+type WordMap = HashMap.HashMap String [String]
+
 wordFilter :: String -> Bool
 wordFilter str = notElem '\'' str && length str > 1
 
@@ -55,7 +57,7 @@ filterPartialMatches letters words = do
       Just word -> pure (word, rest)
       Nothing -> []
 
-sMatchLoop :: HashMap.HashMap String [String] -> String -> [String] -> IO ()
+sMatchLoop :: WordMap -> String -> [String] -> IO ()
 sMatchLoop wordmap letters words = do
 
    let sortedLetters = sort letters
@@ -73,8 +75,16 @@ sMatchLoop wordmap letters words = do
    print nextLetters
    sMatchLoop wordmap nextLetters sMatches
 
-foobar :: [Char] -> [String] -> Either String [String]
-foobar = pMatchRecurse 
+foobar :: WordMap -> [Char] -> [String] -> Either String [[String]]
+foobar wordmap letters words = f <$> pMatchRecurse letters words
+   where f = fmap (\word -> HashMap.findWithDefault [word] word wordmap)
+
+pMatchLoop :: WordMap -> [String] -> IO ()
+pMatchLoop wordmap words = do
+   letters <- getLine
+   let sortedLetters = sort letters
+       matches = foobar wordmap sortedLetters words
+   print matches
 
 pMatchRecurse ::
    (MonadError String m) =>
@@ -88,7 +98,8 @@ pMatchRecurse letters words =
    in
    beepboop words sortedByLongest
    where
-      sortfn (word1, _) (word2, _) = length word1 `compare` length word2
+      -- puts longest words first
+      sortfn (word1, _) (word2, _) = length word2 `compare` length word1
 
 
 beepboop ::
@@ -106,10 +117,10 @@ beepboop words ((nextWord, remaining):otherOptions) =
             ) (const $ beepboop words otherOptions)
 
 
-insertAll :: [String] -> HashMap.HashMap String [String] -> HashMap.HashMap String [String]
+insertAll :: [String] -> WordMap -> WordMap
 insertAll xs wordmap = foldl (flip insertToMap) wordmap xs
 
-insertToMap :: String -> HashMap.HashMap String [String] -> HashMap.HashMap String [String]
+insertToMap :: String -> WordMap -> WordMap
 insertToMap x = HashMap.insertWith f (sort x) [x]
    where f new old = new ++ old
 
@@ -126,4 +137,5 @@ main = do
    let sorted = Vec.toList $ Vec.uniq $ Vec.fromList $ sort $ fmap sort words
        wordmap = insertAll words HashMap.empty
 
-   sMatchLoop wordmap "" sorted
+   -- sMatchLoop wordmap "" sorted
+   pMatchLoop wordmap sorted
