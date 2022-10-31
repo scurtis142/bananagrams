@@ -16,6 +16,21 @@ import Control.Monad.Except (MonadError (throwError), catchError)
 
 type WordMap = HashMap.HashMap String [String]
 
+scabbleValue :: Char -> Int
+scabbleValue char
+   | char `elem` "aeioulnstr" = 1
+   | char `elem` "dg" = 2
+   | char `elem` "bcmp" = 3
+   | char `elem` "fhvwy" = 4
+   | char `elem` "k" = 5
+   | char `elem` "jx" = 8
+   | char `elem` "qz" = 10
+   | otherwise = error "Found a non-lowercase letter"
+
+wordScrabbleValue :: String -> Int
+wordScrabbleValue = foldl f 0
+   where f i =  (+) i . scabbleValue
+
 wordFilter :: String -> Bool
 wordFilter str = notElem '\'' str && length str > 1
 
@@ -99,7 +114,7 @@ pMatchRecurse letters words =
    beepboop words sortedByLongest
    where
       -- puts longest words first
-      sortfn (word1, _) (word2, _) = length word2 `compare` length word1
+      sortfn (word1, _) (word2, _) = wordScrabbleValue word2 `compare` wordScrabbleValue word1
 
 
 beepboop ::
