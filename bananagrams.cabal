@@ -19,4 +19,4 @@ executable bananagrams
 
     hs-source-dirs:   app
     default-language: Haskell2010
-    ghc-options:      -Wall -Werror -prof -fprof-auto
+    ghc-options:      -Wall -Werror
