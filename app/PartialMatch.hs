@@ -12,11 +12,17 @@ import Data.Bifunctor (Bifunctor(first))
 
 import WordMap
 
+{-
+sharedPartialMatch
+[Char] -> [Char] -> String -> m (Bool, Char)
+sharedPartialMatch canUse useOneOf word =
+-}
+
 partialMatch :: [Char] -> String -> Writer [Char] Bool
 partialMatch [] [] = pure True
-partialMatch (l:ls) [] = tell [l] >> partialMatch ls ""
 partialMatch [] _word = pure False
-partialMatch (l:ls) (w:ws) = 
+partialMatch (l:ls) [] = tell [l] >> partialMatch ls ""
+partialMatch (l:ls) (w:ws) =
    if l == w
       then partialMatch ls ws
       else tell [l] >> partialMatch ls (w:ws)
@@ -29,7 +35,7 @@ partialMatches letters = fmap f
 filterPartialMatches :: [Char] -> [String] -> [(String, [Char])]
 filterPartialMatches letters words = do
    (mword, rest) <- partialMatches letters words
-   case mword of 
+   case mword of
       Just word -> pure (word, rest)
       Nothing -> []
 
@@ -74,3 +80,5 @@ pMatch wordmap words = do
    let sortedLetters = sort letters
        matches = runRecurse wordmap sortedLetters words
    print matches
+
+--eevosfobhwyeekesnrtexi

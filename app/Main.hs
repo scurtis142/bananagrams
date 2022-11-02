@@ -23,7 +23,7 @@ readWords = do
 
 main :: IO ()
 main = do
-   
+
    words <- readWords
 
    let sorted = Vec.toList $ Vec.uniq $ Vec.fromList $ sort $ fmap sort words
