@@ -5,12 +5,15 @@ module PartialMatch where
 import Prelude hiding (words)
 
 import Data.List (sort, sortBy)
-import Control.Monad.Writer (Writer, tell, runWriter)
+import Control.Monad.Writer (Writer, tell, runWriter, replicateM)
 import qualified Data.HashMap.Strict as HashMap
 import Control.Monad.Except (MonadError (throwError), catchError)
 import Data.Bifunctor (Bifunctor(first))
+import Control.Concurrent.STM
+import Control.Concurrent.STM.TBMQueue
 
 import WordMap
+import Control.Concurrent.Async (async, waitAny)
 
 {-
 sharedPartialMatch
@@ -73,6 +76,45 @@ pMatchRecurse letters words =
 runRecurse :: WordMap -> [Char] -> [String] -> Either String [[String]]
 runRecurse wordmap letters words = f <$> pMatchRecurse letters words
    where f = fmap (\word -> HashMap.findWithDefault [word] word wordmap)
+
+runTryNextWord :: WordMap -> [String] -> (String, [Char]) -> Either String [[String]]
+runTryNextWord wordmap words option = f <$> tryNextWord words [option]
+   where f = fmap (\word -> HashMap.findWithDefault [word] word wordmap)
+
+runRecurseThreaded :: 
+   WordMap ->
+   TBMQueue (String, [Char]) ->
+   [String] ->
+   IO (Either String [[String]])
+runRecurseThreaded wordmap q words = loop
+   where 
+      loop = do
+         mnext <- atomically $ readTBMQueue q
+         case mnext of
+            Nothing -> pure $ Left "no matches available"
+            Just next -> case runTryNextWord wordmap words next of
+               Left _ -> loop 
+               Right results -> pure $ Right results
+
+sendWords :: [a] -> TBMQueue a -> IO ()
+sendWords xs q = do
+   () <- mapM_ (atomically . writeTBMQueue q) xs
+   atomically $ closeTBMQueue q
+
+pMatchThreaded :: WordMap -> [String] -> IO ()
+pMatchThreaded wordmap words = do
+   letters <- getLine
+   let sortedLetters = sort letters
+       fpMatches = filterPartialMatches sortedLetters words
+       sortedByLongest = sortBy sortfn fpMatches
+   q <- newTBMQueueIO 10000
+   threads <- replicateM 4 $ async $ runRecurseThreaded wordmap q words
+   _ <- async $ sendWords sortedByLongest q
+   (_, res) <- waitAny threads
+   print res
+   where
+      -- puts highest value words first
+      sortfn (word1, _) (word2, _) = wordScrabbleValue word2 `compare` wordScrabbleValue word1
 
 pMatch :: WordMap -> [String] -> IO ()
 pMatch wordmap words = do
